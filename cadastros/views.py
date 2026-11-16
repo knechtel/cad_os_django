@@ -1,11 +1,14 @@
 from decimal import Decimal
 
+from django.db import transaction
 from django.db.models import Count, DecimalField, Sum, Value
 from django.db.models.functions import Coalesce
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
-from rest_framework import filters, viewsets
+from rest_framework import filters, status, viewsets
 from rest_framework.decorators import action
+from rest_framework.exceptions import ValidationError
+from rest_framework.response import Response
 
 from .models import Aparelho, Cliente
 from .serializers import AparelhoSerializer, ClienteSerializer
@@ -21,6 +24,73 @@ class ClienteViewSet(viewsets.ModelViewSet):
     search_fields = ["nome", "telefone", "cpf", "endereco"]
     ordering_fields = ["nome", "criado_em"]
     ordering = ["nome"]
+
+    @action(detail=False, methods=["post"], url_path="importar")
+    def importar(self, request):
+        """Importa clientes e aparelhos relacionados em uma única operação."""
+        dados = request.data
+        if isinstance(dados, dict):
+            dados = dados.get("clientes")
+        if not isinstance(dados, list) or not dados:
+            return Response(
+                {"detail": "Envie uma lista não vazia de clientes, diretamente ou no campo 'clientes'."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        formato_externo = any(isinstance(item, dict) and ("name" in item or "devices" in item) for item in dados)
+        aparelhos_por_cliente = []
+        if formato_externo:
+            clientes_dados = []
+            for indice, item in enumerate(dados):
+                if not isinstance(item, dict):
+                    raise ValidationError({indice: "Cada cliente deve ser um objeto JSON."})
+                clientes_dados.append({
+                    "nome": item.get("name"),
+                    "telefone": item.get("phone", ""),
+                    "cpf": item.get("cpf") or "",
+                    "endereco": item.get("address", ""),
+                })
+                devices = item.get("devices", [])
+                if not isinstance(devices, list):
+                    raise ValidationError({indice: {"devices": "Este campo deve ser uma lista."}})
+                aparelhos_por_cliente.append(devices)
+            dados = clientes_dados
+
+        cpfs = [item["cpf"].strip() for item in dados
+                if isinstance(item, dict) and isinstance(item.get("cpf"), str)]
+        cpfs_informados = [cpf for cpf in cpfs if cpf]
+        if len(cpfs_informados) != len(set(cpfs_informados)):
+            raise ValidationError({"cpf": "Há CPFs repetidos na lista de clientes."})
+
+        serializer = self.get_serializer(data=dados, many=True)
+        serializer.is_valid(raise_exception=True)
+        with transaction.atomic():
+            clientes = serializer.save()
+            if formato_externo:
+                aparelhos_dados = []
+                for cliente, devices in zip(clientes, aparelhos_por_cliente):
+                    for device_indice, device in enumerate(devices):
+                        if not isinstance(device, dict):
+                            raise ValidationError({"devices": f"O aparelho {device_indice} do cliente {cliente.nome} deve ser um objeto JSON."})
+                        aparelhos_dados.append({
+                            "cliente": cliente.pk,
+                            "modelo": device.get("model"),
+                            "marca": device.get("brand", ""),
+                            "numero_serial": device.get("serialNumber", ""),
+                            "descricao": device.get("description", ""),
+                            "preco": device.get("price", 0),
+                            "createdAt": device.get("createdAt"),
+                            "deliveredAt": device.get("deliveredAt"),
+                        })
+                if aparelhos_dados:
+                    aparelhos_serializer = AparelhoSerializer(data=aparelhos_dados, many=True)
+                    aparelhos_serializer.is_valid(raise_exception=True)
+                    aparelhos_serializer.save()
+        clientes = self.get_queryset().filter(pk__in=[cliente.pk for cliente in clientes])
+        return Response(
+            self.get_serializer(clientes, many=True).data,
+            status=status.HTTP_201_CREATED,
+        )
 
     @action(detail=True, methods=["get"], url_path="relatorio.pdf", renderer_classes=[])
     def relatorio_pdf(self, request, pk=None):
@@ -47,6 +117,27 @@ class AparelhoViewSet(viewsets.ModelViewSet):
     search_fields = ["modelo", "marca", "numero_serial", "descricao", "cliente__nome"]
     ordering_fields = ["modelo", "marca", "preco", "criado_em"]
     ordering = ["id"]
+
+    @action(detail=False, methods=["post"], url_path="importar")
+    def importar(self, request):
+        """Importa vários aparelhos em uma única operação."""
+        dados = request.data
+        if isinstance(dados, dict):
+            dados = dados.get("aparelhos")
+        if not isinstance(dados, list) or not dados:
+            return Response(
+                {"detail": "Envie uma lista não vazia de aparelhos, diretamente ou no campo 'aparelhos'."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        serializer = self.get_serializer(data=dados, many=True)
+        serializer.is_valid(raise_exception=True)
+        with transaction.atomic():
+            aparelhos = serializer.save()
+        return Response(
+            self.get_serializer(aparelhos, many=True).data,
+            status=status.HTTP_201_CREATED,
+        )
 
     def get_queryset(self):
         queryset = super().get_queryset()
