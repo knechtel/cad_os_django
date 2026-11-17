@@ -92,7 +92,7 @@ class ClienteViewSet(viewsets.ModelViewSet):
             status=status.HTTP_201_CREATED,
         )
 
-    @action(detail=True, methods=["get"], url_path="relatorio.pdf", renderer_classes=[])
+    @action(detail=True, methods=["get"], url_path="relatorio.pdf")
     def relatorio_pdf(self, request, pk=None):
         cliente = get_object_or_404(Cliente.objects.prefetch_related("aparelhos"), pk=pk)
         linhas = ["CADASTRO DE CLIENTE", "", f"Nome: {cliente.nome}",
