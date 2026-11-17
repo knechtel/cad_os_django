@@ -21,10 +21,4 @@ class ClienteSerializer(serializers.ModelSerializer):
         read_only_fields = ["id", "criado_em", "atualizado_em"]
 
     def validate_cpf(self, value):
-        value = value.strip() or None
-        query = Cliente.objects.filter(cpf=value) if value else Cliente.objects.none()
-        if self.instance:
-            query = query.exclude(pk=self.instance.pk)
-        if query.exists():
-            raise serializers.ValidationError("Já existe um cliente cadastrado com este CPF.")
-        return value
+        return value.strip() or None

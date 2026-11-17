@@ -56,12 +56,6 @@ class ClienteViewSet(viewsets.ModelViewSet):
                 aparelhos_por_cliente.append(devices)
             dados = clientes_dados
 
-        cpfs = [item["cpf"].strip() for item in dados
-                if isinstance(item, dict) and isinstance(item.get("cpf"), str)]
-        cpfs_informados = [cpf for cpf in cpfs if cpf]
-        if len(cpfs_informados) != len(set(cpfs_informados)):
-            raise ValidationError({"cpf": "Há CPFs repetidos na lista de clientes."})
-
         serializer = self.get_serializer(data=dados, many=True)
         serializer.is_valid(raise_exception=True)
         with transaction.atomic():
@@ -154,8 +148,16 @@ def _build_pdf(lines):
         escaped = encoded.replace(b"\\", b"\\\\").replace(b"(", b"\\(").replace(b")", b"\\)")
         return b"(" + escaped + b")"
 
-    commands = [b"BT", b"/F1 11 Tf", b"50 790 Td", b"15 TL"]
-    for index, line in enumerate(lines[:48]):
+    # Cabeçalho com a marca Delta em vetor e os dados da assistência.
+    commands = [
+        b"q", b"0.78 0.08 0.12 rg", b"50 814 m", b"65 790 l",
+        b"37 790 l", b"h", b"f", b"Q",
+        b"BT", b"/F1 15 Tf", b"70 798 Td", pdf_text("DELTA AIR LINES"), b"Tj", b"ET",
+        b"BT", b"/F1 10 Tf", b"50 773 Td",
+        pdf_text("Fernandes Bastos, 1978 - Loja 2 | Telefone: (51) 9350-1980"), b"Tj", b"ET",
+        b"BT", b"/F1 11 Tf", b"50 746 Td", b"15 TL",
+    ]
+    for index, line in enumerate(lines[:45]):
         if index:
             commands.append(b"T*")
         commands.extend([pdf_text(line), b"Tj"])

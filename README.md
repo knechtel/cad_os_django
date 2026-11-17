@@ -69,7 +69,7 @@ Também é aceito o formato `{ "aparelhos": [ ... ] }`. Em caso de sucesso, a AP
 
 ### Importação em lote de clientes
 
-Envie uma lista de clientes diretamente ou dentro da propriedade `clientes`. O endpoint aceita os campos internos do cadastro individual ou o formato exportado pelo aplicativo (`name`, `phone`, `address` e `devices`). Os aparelhos aninhados são importados junto com cada cliente. CPFs devem ser únicos tanto entre os clientes existentes quanto dentro da própria lista.
+Envie uma lista de clientes diretamente ou dentro da propriedade `clientes`. O endpoint aceita os campos internos do cadastro individual ou o formato exportado pelo aplicativo (`name`, `phone`, `address` e `devices`). Os aparelhos aninhados são importados junto com cada cliente. CPFs podem se repetir entre clientes.
 
 ```json
 POST /api/clientes/importar/
@@ -112,5 +112,5 @@ POST /api/clientes/importar/
 - Cliente: `nome`, `telefone`, `cpf`, `endereco`.
 - Aparelho: `cliente`, `modelo`, `marca`, `numero_serial`, `descricao`, `preco`, `createdAt`, `deliveredAt`. Os dois últimos são inteiros de 64 bits (long) e podem ser nulos.
 
-Excluir um cliente também exclui seus aparelhos associados. O CPF é opcional, mas quando informado deve ser único.
+Excluir um cliente também exclui seus aparelhos associados. O CPF é opcional e pode se repetir entre clientes.
 # cad_os_django
