@@ -1,5 +1,7 @@
 from django.contrib import admin
 from datetime import datetime, timezone as datetime_timezone
+from django.urls import reverse
+from django.utils.html import format_html
 from django.utils import timezone
 
 from .models import Aparelho, Cliente
@@ -35,6 +37,14 @@ class ClienteAdmin(admin.ModelAdmin):
     list_display = ["nome", "telefone", "cpf", "criado_em"]
     search_fields = ["nome", "telefone", "cpf"]
     inlines = [AparelhoInline]
+    readonly_fields = ["link_relatorio"]
+
+    @admin.display(description="Relatório")
+    def link_relatorio(self, obj):
+        if not obj or not obj.pk:
+            return "Salve o cliente para gerar o relatório."
+        url = reverse("cliente-relatorio-pdf", args=[obj.pk])
+        return format_html('<a href="{}" target="_blank">Abrir relatório do cliente (PDF)</a>', url)
 
 
 @admin.register(Aparelho)
