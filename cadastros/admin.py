@@ -34,10 +34,10 @@ class AparelhoInline(admin.TabularInline):
 
 @admin.register(Cliente)
 class ClienteAdmin(admin.ModelAdmin):
-    list_display = ["nome", "telefone", "cpf", "criado_em"]
+    list_display = ["id", "nome", "telefone", "cpf", "criado_em"]
     search_fields = ["nome", "telefone", "cpf"]
     inlines = [AparelhoInline]
-    readonly_fields = ["link_relatorio"]
+    readonly_fields = ["id", "link_relatorio"]
 
     @admin.display(description="Relatório")
     def link_relatorio(self, obj):
